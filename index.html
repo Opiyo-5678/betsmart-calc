@@ -326,20 +326,71 @@
                                                 <label className="block text-sm font-semibold text-emerald-400 mb-3 uppercase tracking-wide">
                                                     Number of Events
                                                 </label>
-                                                <select
-                                                    value={numEvents}
-                                                    onChange={(e) => setNumEvents(parseInt(e.target.value))}
-                                                    disabled={currentEvent > 1}
-                                                    className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl text-white text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                                >
-                                                    <option value="2">2 Events</option>
-                                                    <option value="3">3 Events</option>
-                                                    <option value="4">4 Events</option>
-                                                    <option value="5">5 Events</option>
-                                                    <option value="6">6 Events</option>
-                                                    <option value="7">7 Events</option>
-                                                    <option value="8">8 Events</option>
-                                                </select>
+                                                <div className="relative">
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        list="events-list"
+                                                        value={numEvents}
+                                                        onKeyDown={(e) => {
+                                                            // Allow navigation and editing keys
+                                                            const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+                                                            
+                                                            // Allow Ctrl/Cmd combinations
+                                                            if (e.ctrlKey || e.metaKey) {
+                                                                return;
+                                                            }
+                                                            
+                                                            // Allow special keys
+                                                            if (allowedKeys.includes(e.key)) {
+                                                                return;
+                                                            }
+                                                            
+                                                            // Only allow numbers 2-8
+                                                            if (e.key >= '2' && e.key <= '8') {
+                                                                return;
+                                                            }
+                                                            
+                                                            // Block everything else
+                                                            e.preventDefault();
+                                                        }}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            
+                                                            // If empty, allow it temporarily
+                                                            if (val === '') {
+                                                                return;
+                                                            }
+                                                            
+                                                            const num = parseInt(val);
+                                                            
+                                                            // Only update if valid
+                                                            if (!isNaN(num) && num >= 2 && num <= 8) {
+                                                                setNumEvents(num);
+                                                            }
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            const val = parseInt(e.target.value);
+                                                            // If invalid or empty, reset to current or default
+                                                            if (isNaN(val) || val < 2 || val > 8) {
+                                                                setNumEvents(numEvents || 6);
+                                                                e.target.value = numEvents || 6;
+                                                            }
+                                                        }}
+                                                        disabled={currentEvent > 1}
+                                                        className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl text-white text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                                        placeholder="2-8"
+                                                    />
+                                                    <datalist id="events-list">
+                                                        <option value="2">2 Events</option>
+                                                        <option value="3">3 Events</option>
+                                                        <option value="4">4 Events</option>
+                                                        <option value="5">5 Events</option>
+                                                        <option value="6">6 Events</option>
+                                                        <option value="7">7 Events</option>
+                                                        <option value="8">8 Events</option>
+                                                    </datalist>
+                                                </div>
                                                 <p className="text-xs text-slate-400 mt-2">Maximum 8 events</p>
                                             </div>
 
@@ -347,18 +398,20 @@
                                                 <label className="block text-sm font-semibold text-emerald-400 mb-3 uppercase tracking-wide">
                                                     Bet Type
                                                 </label>
-                                                <select
+                                                <input
+                                                    type="number"
+                                                    min="2"
+                                                    max={numEvents}
                                                     value={betSize}
-                                                    onChange={(e) => setBetSize(parseInt(e.target.value))}
+                                                    onChange={(e) => {
+                                                        const val = parseInt(e.target.value) || 2;
+                                                        if (val >= 2 && val <= numEvents) {
+                                                            setBetSize(val);
+                                                        }
+                                                    }}
                                                     disabled={currentEvent > 1}
                                                     className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl text-white text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                                >
-                                                    {Array.from({ length: numEvents - 1 }, (_, i) => i + 2).map(num => (
-                                                        <option key={num} value={num}>
-                                                            {num === 2 ? 'Doubles' : num === 3 ? 'Triples' : num === 4 ? 'Quadruples' : `${num} Picks`}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                />
                                                 <p className="text-xs text-slate-400 mt-2">2=Doubles, 3=Triples, etc.</p>
                                             </div>
 
@@ -629,4 +682,10 @@
         ReactDOM.render(<AccumulatorCalculator />, document.getElementById('root'));
     </script>
 </body>
-</html>
+</html>-800 bg-opacity-50 p-4 rounded-xl">
+                                                        <p className="text-slate-400 text-sm mb-1">Final Payout</p>
+                                                        <p className="text-3xl font-black text-emerald-400">
+                                                            ${totalWinnings.toFixed(2)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="bg-slate
