@@ -331,10 +331,21 @@
                                                     min="2"
                                                     max="8"
                                                     value={numEvents}
-                                                    onInput={(e) => {
-                                                        const val = parseInt(e.target.value);
-                                                        if (val > 8) e.target.value = 8;
-                                                        if (val < 2 && e.target.value !== '') e.target.value = 2;
+                                                    onKeyDown={(e) => {
+                                                        // Allow: backspace, delete, tab, escape, enter
+                                                        if ([8, 46, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                                                            // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                                                            (e.keyCode === 65 && e.ctrlKey === true) ||
+                                                            (e.keyCode === 67 && e.ctrlKey === true) ||
+                                                            (e.keyCode === 86 && e.ctrlKey === true) ||
+                                                            (e.keyCode === 88 && e.ctrlKey === true)) {
+                                                            return;
+                                                        }
+                                                        // Only allow numbers 2-8
+                                                        const key = e.key;
+                                                        if (key < '2' || key > '8' || isNaN(key)) {
+                                                            e.preventDefault();
+                                                        }
                                                     }}
                                                     onChange={(e) => {
                                                         const val = parseInt(e.target.value);
@@ -346,8 +357,19 @@
                                                         const val = parseInt(e.target.value);
                                                         if (isNaN(val) || val < 2) {
                                                             setNumEvents(2);
+                                                            e.target.value = 2;
                                                         } else if (val > 8) {
                                                             setNumEvents(8);
+                                                            e.target.value = 8;
+                                                        }
+                                                    }}
+                                                    onPaste={(e) => {
+                                                        e.preventDefault();
+                                                        const pastedText = e.clipboardData.getData('text');
+                                                        const val = parseInt(pastedText);
+                                                        if (!isNaN(val) && val >= 2 && val <= 8) {
+                                                            setNumEvents(val);
+                                                            e.target.value = val;
                                                         }
                                                     }}
                                                     disabled={currentEvent > 1}
@@ -365,10 +387,21 @@
                                                     min="2"
                                                     max={numEvents}
                                                     value={betSize}
-                                                    onInput={(e) => {
-                                                        const val = parseInt(e.target.value);
-                                                        if (val > numEvents) e.target.value = numEvents;
-                                                        if (val < 2 && e.target.value !== '') e.target.value = 2;
+                                                    onKeyDown={(e) => {
+                                                        // Allow: backspace, delete, tab, escape, enter
+                                                        if ([8, 46, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                                                            // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                                                            (e.keyCode === 65 && e.ctrlKey === true) ||
+                                                            (e.keyCode === 67 && e.ctrlKey === true) ||
+                                                            (e.keyCode === 86 && e.ctrlKey === true) ||
+                                                            (e.keyCode === 88 && e.ctrlKey === true)) {
+                                                            return;
+                                                        }
+                                                        // Only allow numbers 2 to numEvents
+                                                        const key = e.key;
+                                                        if (key < '2' || key > numEvents.toString() || isNaN(key)) {
+                                                            e.preventDefault();
+                                                        }
                                                     }}
                                                     onChange={(e) => {
                                                         const val = parseInt(e.target.value);
@@ -380,8 +413,19 @@
                                                         const val = parseInt(e.target.value);
                                                         if (isNaN(val) || val < 2) {
                                                             setBetSize(2);
+                                                            e.target.value = 2;
                                                         } else if (val > numEvents) {
                                                             setBetSize(numEvents);
+                                                            e.target.value = numEvents;
+                                                        }
+                                                    }}
+                                                    onPaste={(e) => {
+                                                        e.preventDefault();
+                                                        const pastedText = e.clipboardData.getData('text');
+                                                        const val = parseInt(pastedText);
+                                                        if (!isNaN(val) && val >= 2 && val <= numEvents) {
+                                                            setBetSize(val);
+                                                            e.target.value = val;
                                                         }
                                                     }}
                                                     disabled={currentEvent > 1}
