@@ -326,55 +326,20 @@
                                                 <label className="block text-sm font-semibold text-emerald-400 mb-3 uppercase tracking-wide">
                                                     Number of Events
                                                 </label>
-                                                <input
-                                                    type="number"
-                                                    min="2"
-                                                    max="8"
+                                                <select
                                                     value={numEvents}
-                                                    onKeyDown={(e) => {
-                                                        // Allow: backspace, delete, tab, escape, enter
-                                                        if ([8, 46, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
-                                                            // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-                                                            (e.keyCode === 65 && e.ctrlKey === true) ||
-                                                            (e.keyCode === 67 && e.ctrlKey === true) ||
-                                                            (e.keyCode === 86 && e.ctrlKey === true) ||
-                                                            (e.keyCode === 88 && e.ctrlKey === true)) {
-                                                            return;
-                                                        }
-                                                        // Only allow numbers 2-8
-                                                        const key = e.key;
-                                                        if (key < '2' || key > '8' || isNaN(key)) {
-                                                            e.preventDefault();
-                                                        }
-                                                    }}
-                                                    onChange={(e) => {
-                                                        const val = parseInt(e.target.value);
-                                                        if (!isNaN(val) && val >= 2 && val <= 8) {
-                                                            setNumEvents(val);
-                                                        }
-                                                    }}
-                                                    onBlur={(e) => {
-                                                        const val = parseInt(e.target.value);
-                                                        if (isNaN(val) || val < 2) {
-                                                            setNumEvents(2);
-                                                            e.target.value = 2;
-                                                        } else if (val > 8) {
-                                                            setNumEvents(8);
-                                                            e.target.value = 8;
-                                                        }
-                                                    }}
-                                                    onPaste={(e) => {
-                                                        e.preventDefault();
-                                                        const pastedText = e.clipboardData.getData('text');
-                                                        const val = parseInt(pastedText);
-                                                        if (!isNaN(val) && val >= 2 && val <= 8) {
-                                                            setNumEvents(val);
-                                                            e.target.value = val;
-                                                        }
-                                                    }}
+                                                    onChange={(e) => setNumEvents(parseInt(e.target.value))}
                                                     disabled={currentEvent > 1}
                                                     className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl text-white text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                                />
+                                                >
+                                                    <option value="2">2 Events</option>
+                                                    <option value="3">3 Events</option>
+                                                    <option value="4">4 Events</option>
+                                                    <option value="5">5 Events</option>
+                                                    <option value="6">6 Events</option>
+                                                    <option value="7">7 Events</option>
+                                                    <option value="8">8 Events</option>
+                                                </select>
                                                 <p className="text-xs text-slate-400 mt-2">Maximum 8 events</p>
                                             </div>
 
@@ -382,55 +347,18 @@
                                                 <label className="block text-sm font-semibold text-emerald-400 mb-3 uppercase tracking-wide">
                                                     Bet Type
                                                 </label>
-                                                <input
-                                                    type="number"
-                                                    min="2"
-                                                    max={numEvents}
+                                                <select
                                                     value={betSize}
-                                                    onKeyDown={(e) => {
-                                                        // Allow: backspace, delete, tab, escape, enter
-                                                        if ([8, 46, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
-                                                            // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-                                                            (e.keyCode === 65 && e.ctrlKey === true) ||
-                                                            (e.keyCode === 67 && e.ctrlKey === true) ||
-                                                            (e.keyCode === 86 && e.ctrlKey === true) ||
-                                                            (e.keyCode === 88 && e.ctrlKey === true)) {
-                                                            return;
-                                                        }
-                                                        // Only allow numbers 2 to numEvents
-                                                        const key = e.key;
-                                                        if (key < '2' || key > numEvents.toString() || isNaN(key)) {
-                                                            e.preventDefault();
-                                                        }
-                                                    }}
-                                                    onChange={(e) => {
-                                                        const val = parseInt(e.target.value);
-                                                        if (!isNaN(val) && val >= 2 && val <= numEvents) {
-                                                            setBetSize(val);
-                                                        }
-                                                    }}
-                                                    onBlur={(e) => {
-                                                        const val = parseInt(e.target.value);
-                                                        if (isNaN(val) || val < 2) {
-                                                            setBetSize(2);
-                                                            e.target.value = 2;
-                                                        } else if (val > numEvents) {
-                                                            setBetSize(numEvents);
-                                                            e.target.value = numEvents;
-                                                        }
-                                                    }}
-                                                    onPaste={(e) => {
-                                                        e.preventDefault();
-                                                        const pastedText = e.clipboardData.getData('text');
-                                                        const val = parseInt(pastedText);
-                                                        if (!isNaN(val) && val >= 2 && val <= numEvents) {
-                                                            setBetSize(val);
-                                                            e.target.value = val;
-                                                        }
-                                                    }}
+                                                    onChange={(e) => setBetSize(parseInt(e.target.value))}
                                                     disabled={currentEvent > 1}
                                                     className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl text-white text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                                />
+                                                >
+                                                    {Array.from({ length: numEvents - 1 }, (_, i) => i + 2).map(num => (
+                                                        <option key={num} value={num}>
+                                                            {num === 2 ? 'Doubles' : num === 3 ? 'Triples' : num === 4 ? 'Quadruples' : `${num} Picks`}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                                 <p className="text-xs text-slate-400 mt-2">2=Doubles, 3=Triples, etc.</p>
                                             </div>
 
