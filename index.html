@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accumulator Calculator Pro</title>
+    <title>Accumulator Calculator Pro v2</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -41,8 +41,9 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect } = React;
 
+        // Icon components
         const Calculator = ({ size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
                 <rect x="4" y="2" width="16" height="20" rx="2"/>
@@ -71,65 +72,157 @@
             </svg>
         );
 
+        const XIcon = ({ size = 24 }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        );
+
         const AccumulatorCalculator = () => {
             const [numEvents, setNumEvents] = useState(6);
             const [betSize, setBetSize] = useState(3);
             const [unitStake, setUnitStake] = useState(10);
             const [currentEvent, setCurrentEvent] = useState(1);
-            const [accumulatedPayout, setAccumulatedPayout] = useState(0);
-            const [eventResults, setEventResults] = useState([]);
             const [eventOdds, setEventOdds] = useState('');
+            const [eventResults, setEventResults] = useState([]);
+            const [combinations, setCombinations] = useState([]);
 
-            const calculateCombinations = (n, r) => {
-                if (r > n) return 0;
-                if (r === 0 || r === n) return 1;
-                let result = 1;
-                for (let i = 0; i < r; i++) {
-                    result *= (n - i);
-                    result /= (i + 1);
-                }
-                return Math.round(result);
-            };
-
-            const calculateFirstEventCombos = (n, r) => {
-                if (r > n) return 0;
-                return calculateCombinations(n - 1, r - 1);
-            };
-
-            const totalCombinations = calculateCombinations(numEvents, betSize);
-            const firstEventCombos = currentEvent === 1 ? calculateFirstEventCombos(numEvents, betSize) : calculateCombinations(numEvents - currentEvent + 1, betSize - eventResults.filter(e => e.won).length);
-            const c1UnitStake = unitStake;
-            const c2PayoutAmount = accumulatedPayout / (firstEventCombos || 1);
-            const c3TotalStake = c1UnitStake + c2PayoutAmount;
-            const totalStakeForEvent = c3TotalStake * firstEventCombos;
-
-            const handleEventResult = (won) => {
-                if (won && eventOdds) {
-                    const odds = parseFloat(eventOdds);
-                    if (isNaN(odds) || odds <= 0) {
-                        alert('Please enter valid odds');
+            // Generate all combinations of size r from n events
+            const generateCombinations = (n, r) => {
+                const result = [];
+                const generate = (start, combo) => {
+                    if (combo.length === r) {
+                        result.push([...combo]);
                         return;
                     }
-                    const grossWin = totalStakeForEvent * odds;
-                    setAccumulatedPayout(grossWin);
-                    setEventResults([...eventResults, { event: currentEvent, won: true, odds, payout: grossWin }]);
-                } else {
-                    setEventResults([...eventResults, { event: currentEvent, won: false }]);
-                    setAccumulatedPayout(0);
+                    for (let i = start; i <= n; i++) {
+                        combo.push(i);
+                        generate(i + 1, combo);
+                        combo.pop();
+                    }
+                };
+                generate(1, []);
+                return result;
+            };
+
+            // Initialize combinations when settings change
+            useEffect(() => {
+                if (currentEvent === 1) {
+                    const allCombos = generateCombinations(numEvents, betSize);
+                    setCombinations(allCombos.map(combo => ({
+                        events: combo,
+                        alive: true,
+                        accumulatedStake: unitStake,
+                        history: []
+                    })));
                 }
+            }, [numEvents, betSize, unitStake, currentEvent]);
+
+            // Get combinations that include current event and are still alive
+            const getActiveCombos = () => {
+                return combinations.filter(c => c.alive && c.events.includes(currentEvent));
+            };
+
+            // Calculate column values for current event
+            const calculateColumns = () => {
+                const activeCombos = getActiveCombos();
+                
+                // Split into those with accumulated payout vs base stake only
+                const withPayout = activeCombos.filter(c => c.accumulatedStake > unitStake);
+                const baseStake = activeCombos.filter(c => c.accumulatedStake === unitStake);
+                
+                const c1 = baseStake.length * unitStake;
+                const c2Total = withPayout.reduce((sum, c) => sum + c.accumulatedStake, 0);
+                const c2PerCombo = withPayout.length > 0 ? withPayout[0].accumulatedStake : 0;
+                const c3 = c1 + c2Total;
+                
+                return {
+                    c1,
+                    c2Total,
+                    c2PerCombo,
+                    c3,
+                    activeCombos: activeCombos.length,
+                    withPayoutCount: withPayout.length,
+                    baseStakeCount: baseStake.length
+                };
+            };
+
+            const handleEventResult = (won) => {
+                const activeCombos = getActiveCombos();
+                
+                if (won) {
+                    const odds = parseFloat(eventOdds);
+                    if (isNaN(odds) || odds <= 0) {
+                        alert('Please enter valid odds (must be greater than 0)');
+                        return;
+                    }
+
+                    // Update combinations: multiply accumulated stake by odds for winning combos
+                    const updatedCombos = combinations.map(combo => {
+                        if (combo.alive && combo.events.includes(currentEvent)) {
+                            const newStake = combo.accumulatedStake * odds;
+                            return {
+                                ...combo,
+                                accumulatedStake: newStake,
+                                history: [...combo.history, { event: currentEvent, won: true, odds, stake: newStake }]
+                            };
+                        }
+                        return combo;
+                    });
+
+                    setCombinations(updatedCombos);
+                    setEventResults([...eventResults, {
+                        event: currentEvent,
+                        won: true,
+                        odds,
+                        combosActive: activeCombos.length
+                    }]);
+                } else {
+                    // Mark combinations as dead if they include this event
+                    const updatedCombos = combinations.map(combo => {
+                        if (combo.alive && combo.events.includes(currentEvent)) {
+                            return {
+                                ...combo,
+                                alive: false,
+                                history: [...combo.history, { event: currentEvent, won: false }]
+                            };
+                        }
+                        return combo;
+                    });
+
+                    setCombinations(updatedCombos);
+                    setEventResults([...eventResults, {
+                        event: currentEvent,
+                        won: false,
+                        combosKilled: activeCombos.length
+                    }]);
+                }
+
                 setEventOdds('');
                 setCurrentEvent(currentEvent + 1);
             };
 
             const resetCalculator = () => {
                 setCurrentEvent(1);
-                setAccumulatedPayout(0);
                 setEventResults([]);
                 setEventOdds('');
+                const allCombos = generateCombinations(numEvents, betSize);
+                setCombinations(allCombos.map(combo => ({
+                    events: combo,
+                    alive: true,
+                    accumulatedStake: unitStake,
+                    history: []
+                })));
             };
 
+            const columns = calculateColumns();
             const isComplete = currentEvent > numEvents;
-            const totalStaked = eventResults.length > 0 ? totalCombinations * unitStake : 0;
+            const aliveCombos = combinations.filter(c => c.alive).length;
+            const totalCombinations = combinations.length;
+            const totalWinnings = combinations
+                .filter(c => c.alive)
+                .reduce((sum, c) => sum + c.accumulatedStake, 0);
 
             return (
                 <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-teal-50">
@@ -145,7 +238,7 @@
                                     Accumulator <span className="gradient-text">Calculator Pro</span>
                                 </h1>
                                 <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                                    Professional betting tool for tracking multi-event accumulators
+                                    Professional betting tool with proper combination tracking
                                 </p>
                             </div>
 
@@ -173,7 +266,7 @@
                                                 <label className="block text-sm font-semibold text-teal-700 mb-3 uppercase">Bet Type</label>
                                                 <select value={betSize} onChange={(e) => setBetSize(parseInt(e.target.value))} disabled={currentEvent > 1} className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-gray-900 text-lg font-semibold disabled:opacity-50 transition">
                                                     {Array.from({ length: numEvents - 1 }, (_, i) => i + 2).map(num => (
-                                                        <option key={num} value={num}>{num === 2 ? 'Doubles' : num === 3 ? 'Triples' : num === 4 ? 'Quadruples' : `${num} Picks`}</option>
+                                                        <option key={num} value={num}>{num === 2 ? 'Doubles' : num === 3 ? 'Triples' : num === 4 ? 'Quadruples' : `${num}-Folds`}</option>
                                                     ))}
                                                 </select>
                                             </div>
@@ -187,26 +280,26 @@
                                     <div className="bg-gradient-to-br from-teal-50 to-teal-100 border-2 border-teal-400 rounded-2xl p-6 mb-8">
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6">
                                             <div className="text-center">
-                                                <p className="text-teal-700 text-sm font-semibold mb-2 uppercase">Combinations</p>
+                                                <p className="text-teal-700 text-sm font-semibold mb-2 uppercase">Total Combos</p>
                                                 <p className="text-4xl font-black text-gray-900">{totalCombinations}</p>
                                             </div>
                                             <div className="text-center">
-                                                <p className="text-teal-700 text-sm font-semibold mb-2 uppercase">Total Outlay</p>
-                                                <p className="text-4xl font-black text-gray-900">{(totalCombinations * unitStake).toFixed(0)}</p>
+                                                <p className="text-teal-700 text-sm font-semibold mb-2 uppercase">Alive</p>
+                                                <p className="text-4xl font-black text-teal-600">{aliveCombos}</p>
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-teal-700 text-sm font-semibold mb-2 uppercase">Progress</p>
                                                 <p className="text-4xl font-black text-gray-900">{currentEvent - 1}/{numEvents}</p>
                                             </div>
                                             <div className="text-center">
-                                                <p className="text-teal-700 text-sm font-semibold mb-2 uppercase">Wins</p>
-                                                <p className="text-4xl font-black text-gray-900">{eventResults.filter(e => e.won).length}</p>
+                                                <p className="text-teal-700 text-sm font-semibold mb-2 uppercase">Initial Outlay</p>
+                                                <p className="text-4xl font-black text-gray-900">{(totalCombinations * unitStake).toFixed(0)}</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     {!isComplete && (
-                                        <div className="bg-white rounded-2xl p-6 sm:p-8 mb-8 border-2 border-teal-500 highlight-border card-shadow">
+                                        <div className="bg-white rounded-2xl p-6 sm:p-8 mb-8 border-4 highlight-border card-shadow">
                                             <div className="flex items-center gap-3 mb-6">
                                                 <Zap size={32} className="text-teal-600" />
                                                 <h2 className="text-3xl font-black text-gray-900">Event {currentEvent} <span className="text-gray-500 text-xl font-normal">of {numEvents}</span></h2>
@@ -214,43 +307,33 @@
                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                                                 <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-2xl border border-gray-300">
                                                     <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Column 1</p>
-                                                    <p className="text-sm text-teal-700 font-semibold mb-3">Unit Stake</p>
-                                                    <p className="text-3xl font-black text-gray-900">{c1UnitStake.toFixed(2)}</p>
+                                                    <p className="text-sm text-teal-700 font-semibold mb-3">Base Unit Stake</p>
+                                                    <p className="text-3xl font-black text-gray-900">{columns.c1.toFixed(2)}</p>
+                                                    <p className="text-xs text-gray-500 mt-2">{columns.baseStakeCount} new combos</p>
                                                 </div>
                                                 <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-2xl border border-gray-300">
                                                     <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Column 2</p>
-                                                    <p className="text-sm text-teal-700 font-semibold mb-3">Payout Rolling</p>
-                                                    <p className="text-3xl font-black text-teal-600">{c2PayoutAmount.toFixed(2)}</p>
+                                                    <p className="text-sm text-teal-700 font-semibold mb-3">Rolling Payout</p>
+                                                    <p className="text-3xl font-black text-teal-600">{columns.c2Total.toFixed(2)}</p>
+                                                    <p className="text-xs text-gray-500 mt-2">{columns.withPayoutCount} rolling combos</p>
                                                 </div>
                                                 <div className="bg-gradient-to-br from-teal-100 to-teal-200 p-6 rounded-2xl border-2 border-teal-500">
                                                     <p className="text-xs font-bold text-teal-800 mb-2 uppercase">Column 3</p>
-                                                    <p className="text-sm text-teal-800 font-semibold mb-3">Total Per Bet</p>
-                                                    <p className="text-3xl font-black text-gray-900">{c3TotalStake.toFixed(2)}</p>
-                                                </div>
-                                            </div>
-                                            <div className="bg-gray-50 p-6 rounded-xl mb-6 border border-gray-200">
-                                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                                    <div>
-                                                        <p className="text-gray-600 text-sm mb-1">Active Combinations:</p>
-                                                        <p className="text-2xl font-bold text-gray-900">{firstEventCombos}</p>
-                                                    </div>
-                                                    <div className="text-left sm:text-right">
-                                                        <p className="text-gray-600 text-sm mb-1">Total Stake Required:</p>
-                                                        <p className="text-4xl font-black text-teal-600">{totalStakeForEvent.toFixed(2)}</p>
-                                                    </div>
+                                                    <p className="text-sm text-teal-800 font-semibold mb-3">Stake for This Event</p>
+                                                    <p className="text-4xl font-black text-gray-900">{columns.c3.toFixed(2)}</p>
+                                                    <p className="text-xs text-teal-700 mt-2">{columns.activeCombos} active combos</p>
                                                 </div>
                                             </div>
                                             <div className="mb-6">
                                                 <label className="block text-sm font-bold text-gray-900 mb-3 uppercase">Enter Odds (Decimal Format)</label>
-                                                <input type="number" step="0.01" min="0" value={eventOdds} onChange={(e) => setEventOdds(e.target.value)} placeholder="e.g., 3.46" className="w-full px-6 py-4 bg-white border-2 border-gray-300 rounded-xl text-gray-900 text-lg font-semibold placeholder-gray-400 transition" />
+                                                <input type="number" step="0.01" min="1" value={eventOdds} onChange={(e) => setEventOdds(e.target.value)} placeholder="e.g., 3.46" className="w-full px-6 py-4 bg-white border-2 border-gray-300 rounded-xl text-gray-900 text-lg font-semibold placeholder-gray-400 transition" />
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <button onClick={() => handleEventResult(true)} disabled={!eventOdds} className="btn-primary text-white font-bold py-4 px-6 rounded-xl text-lg disabled:opacity-50 flex items-center justify-center gap-2">
-                                                    <TrendingUp size={24} />Won - Apply Payout
+                                                    <TrendingUp size={24} />Won - Roll Payout
                                                 </button>
                                                 <button onClick={() => handleEventResult(false)} className="btn-danger text-white font-bold py-4 px-6 rounded-xl text-lg flex items-center justify-center gap-2">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                    Lost - Next Event
+                                                    <XIcon size={24} />Lost - Kill Combos
                                                 </button>
                                             </div>
                                         </div>
@@ -265,11 +348,14 @@
                                                         <span className="text-gray-900 font-bold text-lg">Event {result.event}</span>
                                                         {result.won ? (
                                                             <div className="text-left sm:text-right">
-                                                                <p className="text-teal-700 font-bold text-lg">Won @ {result.odds}x</p>
-                                                                <p className="text-teal-600 text-sm">Payout: ${result.payout.toFixed(2)}</p>
+                                                                <p className="text-teal-700 font-bold text-lg">Won @ {result.odds.toFixed(2)}x</p>
+                                                                <p className="text-teal-600 text-sm">{result.combosActive} combos advanced</p>
                                                             </div>
                                                         ) : (
-                                                            <span className="text-red-600 font-bold text-lg">Lost</span>
+                                                            <div className="text-left sm:text-right">
+                                                                <p className="text-red-600 font-bold text-lg">Lost</p>
+                                                                <p className="text-red-500 text-sm">{result.combosKilled} combos eliminated</p>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 ))}
@@ -279,10 +365,20 @@
 
                                     {isComplete && (
                                         <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-2xl p-8 text-center border-2 border-teal-500">
-                                            <h2 className="text-4xl font-black text-gray-900 mb-4">All Events Complete!</h2>
-                                            <div className="bg-white p-4 rounded-xl border border-gray-200 max-w-xs mx-auto mb-6">
-                                                <p className="text-gray-600 text-sm mb-1">Total Staked</p>
-                                                <p className="text-3xl font-black text-gray-900">{totalStaked.toFixed(2)}</p>
+                                            <h2 className="text-4xl font-black text-gray-900 mb-6">All Events Complete!</h2>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto mb-6">
+                                                <div className="bg-white p-4 rounded-xl border border-gray-200">
+                                                    <p className="text-gray-600 text-sm mb-1">Total Invested</p>
+                                                    <p className="text-3xl font-black text-gray-900">{(totalCombinations * unitStake).toFixed(2)}</p>
+                                                </div>
+                                                <div className="bg-white p-4 rounded-xl border border-gray-200">
+                                                    <p className="text-gray-600 text-sm mb-1">Winning Combos</p>
+                                                    <p className="text-3xl font-black text-teal-600">{aliveCombos}</p>
+                                                </div>
+                                                <div className="bg-white p-4 rounded-xl border border-gray-200">
+                                                    <p className="text-gray-600 text-sm mb-1">Total Winnings</p>
+                                                    <p className="text-3xl font-black text-teal-600">{totalWinnings.toFixed(2)}</p>
+                                                </div>
                                             </div>
                                             <button onClick={resetCalculator} className="btn-primary text-white font-bold py-4 px-8 rounded-xl text-lg">Start New Calculation</button>
                                         </div>
@@ -294,27 +390,27 @@
                                 </div>
 
                                 <div className="bg-white rounded-2xl p-8 border border-gray-200 card-hover card-shadow">
-                                    <h3 className="text-2xl font-bold text-gray-900 mb-6">How It Works</h3>
+                                    <h3 className="text-2xl font-bold text-gray-900 mb-6">How It Works - Fixed Logic</h3>
                                     <div className="space-y-4">
                                         <div className="flex gap-4">
                                             <div className="flex-shrink-0 w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white font-bold">1</div>
-                                            <p className="text-gray-700">Configure your bet by setting the number of events, bet type, and unit stake amount</p>
+                                            <p className="text-gray-700">Each combination is tracked independently as a separate "string" with its own state</p>
                                         </div>
                                         <div className="flex gap-4">
                                             <div className="flex-shrink-0 w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white font-bold">2</div>
-                                            <p className="text-gray-700">View the three-column display showing your unit stake, rolling payout, and total stake per bet</p>
+                                            <p className="text-gray-700"><strong>Column 1</strong> shows the stake for NEW combinations that start at this event (base unit stake only)</p>
                                         </div>
                                         <div className="flex gap-4">
                                             <div className="flex-shrink-0 w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white font-bold">3</div>
-                                            <p className="text-gray-700">For each event, enter the decimal odds if it wins, or mark it as lost</p>
+                                            <p className="text-gray-700"><strong>Column 2</strong> shows accumulated payout from previous wins, for combinations rolling forward</p>
                                         </div>
                                         <div className="flex gap-4">
                                             <div className="flex-shrink-0 w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white font-bold">4</div>
-                                            <p className="text-gray-700">When an event wins, the payout automatically rolls into the next event's stake</p>
+                                            <p className="text-gray-700"><strong>Column 3</strong> shows the TOTAL amount you stake on this single event (C1 + C2)</p>
                                         </div>
                                         <div className="flex gap-4">
                                             <div className="flex-shrink-0 w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white font-bold">5</div>
-                                            <p className="text-gray-700">Track your progress with the history log showing wins, losses, odds, and payouts</p>
+                                            <p className="text-gray-700">When any leg of a combination loses, that entire combination is eliminated forever</p>
                                         </div>
                                     </div>
                                 </div>
@@ -323,8 +419,8 @@
 
                         <footer className="max-w-7xl mx-auto mt-16 pb-8 text-center">
                             <div className="bg-white rounded-2xl p-8 border border-gray-200">
-                                <p className="text-gray-600 text-sm">© 2025 Accumulator Calculator Pro</p>
-                                <p className="text-gray-500 text-xs mt-2">Always gamble responsibly</p>
+                                <p className="text-gray-600 text-sm">© 2025 Accumulator Calculator Pro v2</p>
+                                <p className="text-gray-500 text-xs mt-2">Always gamble responsibly • Fixed combination tracking logic</p>
                             </div>
                         </footer>
                     </div>
